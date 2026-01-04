@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automatic Flowchart Generator</title>
+  <style>
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f4f6f8; }
+    header { background: #1e293b; color: #fff; padding: 12px; text-align: center; font-size: 20px; }
+    .container { display: grid; grid-template-columns: 1fr 2fr; height: calc(100vh - 56px); }
+    .left { padding: 15px; background: #ffffff; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+    textarea { flex: 1; resize: none; padding: 10px; font-family: Consolas, monospace; font-size: 14px; }
+    button { margin-top: 10px; padding: 10px; font-size: 15px; border: none; border-radius: 6px; background: #2563eb; color: white; cursor: pointer; }
+    .right { background: #f8fafc; overflow: auto; padding: 20px; }
+    svg { background: #fff; border: 1px solid #ddd; border-radius: 8px; }
+  </style>
+</head>
+<body>
+<header>Automatic Flowchart Generator (IF–ELSE, LOOPS, EXPORT)</header>
+
+<div class="container">
+  <div class="left">
+    <h3>Enter Algorithm</h3>
+    <textarea id="algo" placeholder="START
+INPUT n
+IF n > 0
+  PRINT n
+ELSE
+  PRINT 0
+END IF
+FOR i = 1 TO n
+  PRINT i
+END FOR
+STOP"></textarea>
+    <button onclick="generateFlowchart()">Generate Flowchart</button>
+    <button onclick="downloadPNG()">Download as PNG</button>
+  </div>
+  <div class="right">
+    <svg id="chart" width="1800" height="3500"></svg>
+  </div>
+</div>
+
+<script>
+const svg = document.getElementById('chart');
+
+function clearSVG(){ while(svg.firstChild) svg.removeChild(svg.firstChild); }
+
+function arrowDefs(){
+  const defs = document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const marker = document.createElementNS('http://www.w3.org/2000/svg','marker');
+  marker.setAttribute('id','arrow'); marker.setAttribute('markerWidth','10'); marker.setAttribute('markerHeight','10');
+  marker.setAttribute('refX','10'); marker.setAttribute('refY','3'); marker.setAttribute('orient','auto');
+  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d','M0,0 L10,3 L0,6 Z'); path.setAttribute('fill','#000');
+  marker.appendChild(path); defs.appendChild(marker); svg.appendChild(defs);
+}
+
+function text(x,y,str){
+  const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+  t.setAttribute('x',x); t.setAttribute('y',y);
+  t.setAttribute('text-anchor','middle'); t.setAttribute('dominant-baseline','middle');
+  t.setAttribute('font-size','14'); t.textContent=str; svg.appendChild(t);
+}
+
+function arrow(x1,y1,x2,y2,label=null){
+  const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+  l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+  l.setAttribute('stroke','#000'); l.setAttribute('marker-end','url(#arrow)'); svg.appendChild(l);
+  if(label) text((x1+x2)/2,(y1+y2)/2-10,label);
+}
+
+function rounded(x,y,w,h,str){ const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',w); r.setAttribute('height',h);
+  r.setAttribute('rx',25); r.setAttribute('fill','#dcfce7'); r.setAttribute('stroke','#15803d'); svg.appendChild(r);
+  text(x+w/2,y+h/2,str); }
+
+function rect(x,y,w,h,str){ const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',w); r.setAttribute('height',h);
+  r.setAttribute('fill','#e0f2fe'); r.setAttribute('stroke','#0284c7'); svg.appendChild(r);
+  text(x+w/2,y+h/2,str); }
+
+function parallelogram(x,y,w,h,str){ const p=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  p.setAttribute('points',`${x+20},${y} ${x+w},${y} ${x+w-20},${y+h} ${x},${y+h}`);
+  p.setAttribute('fill','#fef9c3'); p.setAttribute('stroke','#ca8a04'); svg.appendChild(p);
+  text(x+w/2,y+h/2,str); }
+
+function diamond(x,y,w,h,str){ const d=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  d.setAttribute('points',`${x+w/2},${y} ${x+w},${y+h/2} ${x+w/2},${y+h} ${x},${y+h/2}`);
+  d.setAttribute('fill','#fde68a'); d.setAttribute('stroke','#d97706'); svg.appendChild(d);
+  text(x+w/2,y+h/2,str); }
+
+function generateFlowchart(){
+  clearSVG(); arrowDefs();
+  const lines=document.getElementById('algo').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  let x=700,y=30,w=260,h=60,gap=40;
+  let stack=[]; let prev={x:x+w/2,y:y};
+
+  lines.forEach(line=>{
+    if(line==='START'){ rounded(x,y,w,h,'START'); }
+    else if(line==='STOP'){ rounded(x,y,w,h,'STOP'); arrow(prev.x,prev.y,x+w/2,y); }
+    else if(line.startsWith('INPUT')||line.startsWith('PRINT')){ parallelogram(x,y,w,h,line); arrow(prev.x,prev.y,x+w/2,y); }
+    else if(line.startsWith('IF')){
+      diamond(x,y,w,h,line);
+      arrow(prev.x,prev.y,x+w/2,y);
+      stack.push({type:'IF',x,y});
+    }
+    else if(line==='ELSE'){
+      const d=stack[stack.length-1];
+      arrow(d.x+w,y+h/2,d.x+w+200,y+h/2,'NO');
+      prev={x:d.x+w+200,y:y+h/2};
+      return;
+    }
+    else if(line==='END IF'){ stack.pop(); }
+    else if(line.startsWith('WHILE')||line.startsWith('FOR')){
+      diamond(x,y,w,h,line);
+      arrow(prev.x,prev.y,x+w/2,y);
+      stack.push({type:'LOOP',x,y});
+    }
+    else if(line==='END WHILE'||line==='END FOR'){
+      const loop=stack.pop();
+      arrow(x+w/2,y+h,x+w/2,loop.y,'YES');
+    }
+    else{ rect(x,y,w,h,line); arrow(prev.x,prev.y,x+w/2,y); }
+    prev={x:x+w/2,y:y+h}; y+=h+gap;
+  });
+}
+
+function downloadPNG(){
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const canvas = document.createElement('canvas');
+  canvas.width = svg.width.baseVal.value;
+  canvas.height = svg.height.baseVal.value;
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.onload = () => {
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0);
+    const link = document.createElement('a');
+    link.download = 'flowchart.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
+  img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+}
+</script>
+</body>
+</html>
